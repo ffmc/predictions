@@ -184,6 +184,13 @@
   }
   .closing-footer .footer-note a:hover { color: #A1A1AA; }
 
+  /* ── MOBILE FONT SCALE ── */
+  @media (max-width: 767px) {
+    .miss-q   { font-size: 15px !important; }
+    .miss-conf{ font-size: 15px !important; }
+    .miss-meta{ font-size: 13px !important; }
+  }
+
   /* ── TOOLTIP ── */
   .tooltip {
     position: fixed; background: var(--ink); color: #F7F5F0;
@@ -387,6 +394,8 @@ function hideTip() { tooltip.style.opacity = 0; }
 
 // ── CHART DIMENSIONS ──────────────────────────────────────────────────────
 const VW = 860;
+const MOB = window.innerWidth < 768;
+const FSZ = { s: MOB ? '13px' : '11px', m: MOB ? '14px' : '12px', l: MOB ? '15px' : '13px' };
 
 // ── CHART 1: VOLUME ────────────────────────────────────────────────────────
 function drawVolume(container) {
@@ -424,10 +433,10 @@ function drawVolume(container) {
   g.append('g').call(d3.axisLeft(y).ticks(4).tickSize(-w))
     .call(a => a.select('.domain').remove())
     .call(a => a.selectAll('.tick line').attr('stroke', BORDER).attr('stroke-dasharray','3,2'))
-    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size', FSZ.m));
   g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x).tickSize(0).tickPadding(10))
     .call(a => a.select('.domain').remove())
-    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size', FSZ.m));
 
   // Milestones — lane assignment to prevent horizontal overlap
   const CHAR_W = 6.5; // approx px per char at 11px
@@ -470,7 +479,7 @@ function drawVolume(container) {
     g.append('text')
       .attr('x', tx).attr('y', ly)
       .attr('text-anchor', anchor)
-      .style('font-size','11px').style('fill', WRONG).style('font-weight','600')
+      .style('font-size', FSZ.s).style('fill', WRONG).style('font-weight','600')
       .text(ms.label);
   });
 
@@ -509,7 +518,7 @@ function drawRidgeline(container) {
   svg.append('g').attr('transform',`translate(${m.left},${VH - m.bottom})`)
     .call(d3.axisBottom(x).tickSize(0).tickPadding(6))
     .call(a => a.select('.domain').attr('stroke', BORDER))
-    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size', FSZ.m));
 
   sorted.forEach((grp, gi) => {
     const vals  = DATA.ridgeline[grp];
@@ -531,13 +540,13 @@ function drawRidgeline(container) {
     svg.append('text')
       .attr('x', m.left - 8).attr('y', yBase - rowH * 0.28)
       .attr('text-anchor','end').attr('dominant-baseline','middle')
-      .style('font-size','12px').style('fill', INK).style('font-weight','500')
+      .style('font-size', FSZ.m).style('fill', INK).style('font-weight','500')
       .text(grp).attr('opacity',0).transition().delay(gi * 110).duration(700).attr('opacity',1);
 
     svg.append('text')
       .attr('x', m.left + w + 10).attr('y', yBase - rowH * 0.28)
       .attr('dominant-baseline','middle')
-      .style('font-size','12px').style('fill', MUTED).style('font-variant-numeric','tabular-nums')
+      .style('font-size', FSZ.m).style('fill', MUTED).style('font-variant-numeric','tabular-nums')
       .text(total)
       .attr('opacity',0).transition().delay(gi * 110 + 300).duration(700).attr('opacity',1);
   });
@@ -595,7 +604,7 @@ function renderSankey(container, nodes, links, isGroup = false) {
     .attr('fill', d => d.color).attr('rx', 2)
     .attr('opacity',0).transition().duration(900).attr('opacity',1);
 
-  const LABEL_SIZE = '13px';
+  const LABEL_SIZE = FSZ.l;
 
   ng.append('text')
     .attr('x', d => d.x1 > VW / 2 ? d.x1 + 8 : d.x0 - 8)
@@ -647,8 +656,8 @@ function drawSankeyGroups(container) {
 
 // ── CHART 5: BEESWARM ──────────────────────────────────────────────────────
 function drawBeeswarm(container) {
-  const VH = 300;
-  const m  = { top: 48, right: 20, bottom: 48, left: 20 };
+  const VH = 320;
+  const m  = { top: 68, right: 20, bottom: 48, left: 20 };
   const w  = VW - m.left - m.right;
   const h  = VH - m.top - m.bottom;
 
@@ -674,9 +683,9 @@ function drawBeeswarm(container) {
   g.append('line').attr('x1',x(50)).attr('x2',x(50)).attr('y1',0).attr('y2',h)
     .attr('stroke', BORDER).attr('stroke-width',1).attr('stroke-dasharray','4,3');
   g.append('text').attr('x',x(50)).attr('y',-14).attr('text-anchor','middle')
-    .style('font-size','12px').style('fill', MUTED).text('50% confidence');
-  g.append('text').attr('x',0).attr('y',-26).style('font-size','12px').style('fill', MUTED).text('Less confident');
-  g.append('text').attr('x',w).attr('y',-26).attr('text-anchor','end').style('font-size','12px').style('fill', MUTED).text('More confident');
+    .style('font-size', FSZ.m).style('fill', MUTED).text('50% confidence');
+  g.append('text').attr('x',0).attr('y',-26).style('font-size', FSZ.m).style('fill', MUTED).text('Less confident');
+  g.append('text').attr('x',w).attr('y',-26).attr('text-anchor','end').style('font-size', FSZ.m).style('fill', MUTED).text('More confident');
 
   g.selectAll('circle').data(dots).enter().append('circle')
     .attr('cx', d => d.px).attr('cy', h / 2).attr('r', R)
@@ -687,13 +696,13 @@ function drawBeeswarm(container) {
   g.append('g').attr('transform',`translate(0,${h + 14})`)
     .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + '%').tickSize(0).tickPadding(6))
     .call(a => a.select('.domain').attr('stroke', BORDER))
-    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size', FSZ.m));
 
   // Legend
   [[RIGHT,'Crowd right'],[WRONG,'Crowd wrong']].forEach(([c,l],i) => {
-    const lx = m.left + w - 180 + i * 100;
-    svg.append('circle').attr('cx',lx).attr('cy',VH - 10).attr('r',4).attr('fill',c).attr('fill-opacity',0.75);
-    svg.append('text').attr('x',lx + 8).attr('y',VH - 6).style('font-size','12px').style('fill','#52525B').text(l);
+    const lx = m.left + i * 110;
+    svg.append('circle').attr('cx',lx).attr('cy',6).attr('r',4).attr('fill',c).attr('fill-opacity',0.75);
+    svg.append('text').attr('x',lx + 8).attr('y',10).style('font-size', FSZ.m).style('fill','#52525B').text(l);
   });
 }
 
