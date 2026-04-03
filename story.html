@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>We Are Bad at Predictions</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #F7F5F0;
+    --surface: #FFFFFF;
+    --ink:     #18181B;
+    --sub:     #3F3F46;
+    --muted:   #A1A1AA;
+    --border:  #E4E0D8;
+    --right:   #0F766E;
+    --wrong:   #BE123C;
+    --accent:  #B45309;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── OPENING ── */
+  .opening {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: clamp(60px, 10vw, 120px) clamp(24px, 5vw, 60px) clamp(40px, 6vw, 80px);
+  }
+
+  .byline {
+    font-size: 14px; color: var(--muted); margin-bottom: 36px; margin-top: -8px;
+  }
+  .byline a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .byline a:hover { color: var(--ink); }
+
+  .opening h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(42px, 8vw, 96px);
+    font-weight: 900; line-height: 1.02;
+    margin-bottom: 36px;
+    letter-spacing: -0.02em;
+  }
+  .opening h1 em { font-style: italic; color: var(--wrong); }
+
+  .opening .lead {
+    font-size: clamp(15px, 2vw, 18px); color: var(--sub);
+    max-width: 640px; line-height: 1.78; margin-bottom: 64px;
+  }
+
+  /* Big stat numbers */
+  .big-stats {
+    display: flex;
+    gap: clamp(24px, 6vw, 72px);
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    padding-top: 40px;
+    margin-bottom: 20px;
+  }
+  .big-stat {}
+  .big-stat .num {
+    display: block;
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 9vw, 110px);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+  .big-stat .lbl {
+    display: block;
+    font-size: clamp(12px, 1.4vw, 14px);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 10px;
+  }
+
+  .scroll-hint {
+    margin-top: 60px; font-size: 12px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px; letter-spacing: 0.06em;
+  }
+  .scroll-hint::before { content: '↓'; font-size: 15px; }
+
+  /* ── STORY WRAPPER ── */
+  .story-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 clamp(24px, 5vw, 60px) 80px;
+  }
+
+  /* ── STORY STEP ── */
+  .story-step {
+    padding: clamp(60px, 8vw, 100px) 0 clamp(40px, 6vw, 60px);
+    border-top: 1px solid var(--border);
+  }
+
+  .step-num {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 16px;
+  }
+  .step-text h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(26px, 4vw, 46px);
+    font-weight: 700; line-height: 1.1;
+    margin-bottom: 20px; letter-spacing: -0.01em;
+  }
+  .step-text p {
+    color: var(--sub); font-size: clamp(14px, 1.7vw, 16px);
+    line-height: 1.8; margin-bottom: 14px; max-width: 640px;
+  }
+  .step-text p strong { color: var(--ink); font-weight: 600; }
+
+  .highlight-box {
+    background: var(--surface);
+    border-left: 2px solid var(--accent);
+    padding: 14px 20px; margin-top: 16px;
+    border-radius: 0 6px 6px 0;
+    font-size: clamp(13px, 1.5vw, 14px); color: var(--sub); line-height: 1.65;
+    max-width: 560px;
+  }
+
+  .stat-callout {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 8vw, 80px); font-weight: 900;
+    color: var(--ink); line-height: 1; margin: 20px 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .stat-label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  /* ── CHART AREA ── */
+  .step-chart {
+    margin-top: 40px;
+    width: 100%;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1.4s ease, transform 1.2s ease;
+  }
+  .step-chart.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .step-chart svg { width: 100%; overflow: visible; }
+
+  /* ── MISS CARDS ── */
+  .miss-card {
+    background: #EDEAE3; border: 1px solid #E0DDD6;
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 10px;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  .miss-card.visible { opacity: 1; transform: translateY(0); }
+  .miss-q { font-size: clamp(12px, 1.5vw, 13px); color: var(--ink); line-height: 1.55; margin-bottom: 10px; }
+  .miss-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; }
+  .miss-conf { color: var(--ink); font-weight: 700; font-size: 13px; }
+  .miss-group { color: var(--muted); }
+
+  /* ── CLOSING FOOTER ── */
+  .closing-footer {
+    background: var(--ink); color: #F7F5F0;
+    padding: clamp(20px, 3vw, 32px) clamp(24px, 5vw, 80px);
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 16px;
+  }
+  .closing-footer .footer-note {
+    font-size: 11px; color: #52525B; letter-spacing: 0.05em; text-align: center;
+  }
+  .closing-footer .footer-note a {
+    color: #71717A; text-underline-offset: 3px; text-decoration: underline;
+  }
+  .closing-footer .footer-note a:hover { color: #A1A1AA; }
+
+  /* ── TOOLTIP ── */
+  .tooltip {
+    position: fixed; background: var(--ink); color: #F7F5F0;
+    padding: 8px 12px; border-radius: 6px; font-size: 11px;
+    pointer-events: none; opacity: 0; transition: opacity 0.12s;
+    max-width: 280px; line-height: 1.5; z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<!-- OPENING -->
+<section class="opening">
+  <h1>We are <em>bad</em> at<br>predicting the future.</h1>
+  <p class="byline">A story about predictions by <a href="https://www.linkedin.com/in/ffmc/" target="_blank" rel="noopener">Francisco Cardoso</a></p>
+  <p class="lead">
+    How good are we, really? We looked at 2,129 resolved predictions from Metaculus,
+    a platform where thousands of people put real forecasts on the record with confidence scores.
+    Each question typically attracted between 40 and 300 forecasters, with a median around 60.
+    High-profile questions on elections or pandemics drew several thousand.
+    So, how bad are we exactly?
+  </p>
+
+  <div class="big-stats">
+    <div class="big-stat">
+      <span class="num">9</span>
+      <span class="lbl">Years</span>
+    </div>
+    <div class="big-stat">
+      <span class="num">10</span>
+      <span class="lbl">Topics</span>
+    </div>
+    <div class="big-stat">
+      <span class="num">2,129</span>
+      <span class="lbl">Questions</span>
+    </div>
+  </div>
+
+  <div class="scroll-hint">Scroll to explore</div>
+</section>
+
+<!-- STORY STEPS -->
+<div class="story-wrapper">
+
+  <div class="story-step" data-chart="volume">
+    <div class="step-num">01 · Volume</div>
+    <div class="step-text">
+      <h2>Prediction obsession peaked in 2020.</h2>
+      <p>Between 2015 and 2024, the volume of predictions on Metaculus grew steadily, then exploded.
+         In 2020, a global pandemic made the future feel both more urgent and more unknowable than ever.
+         People wanted answers, so they made guesses.</p>
+      <p>Notice how volume stayed high even after COVID faded. Once we start trying to predict, it's hard to stop.</p>
+    </div>
+    <div class="step-chart" id="chart-volume"></div>
+  </div>
+
+  <div class="story-step" data-chart="ridgeline">
+    <div class="step-num">02 · By Topic</div>
+    <div class="step-text">
+      <h2>The world changed. The questions followed.</h2>
+      <p>We grouped all 2,129 questions into 10 topics using machine learning with no manual tagging.
+         Each ridge below shows how much attention a topic attracted, year by year.</p>
+      <p>Some patterns are hard to miss. <strong>COVID-19</strong> went from nothing to the most
+         predicted topic on the platform in a single year, then collapsed almost as fast as it arrived.
+         <strong>Russia / Ukraine</strong> barely registered until February 2022, then exploded overnight.
+         World events don't build gradually. They arrive, and forecasters chase them.</p>
+      <p>Then there's <strong>US Politics</strong>. No pandemic, no war, no once-in-a-generation crisis
+         ever knocked it off the top. Year after year, it pulled in more forecasters than anything else
+         on the planet. Make of that what you will. When something is chaotic enough to keep
+         thousands of analysts guessing indefinitely, that says more about the subject than the forecasters.</p>
+    </div>
+    <div class="step-chart" id="chart-ridgeline"></div>
+  </div>
+
+  <div class="story-step" data-chart="sankey-simple">
+    <div class="step-num">03 · The Answer</div>
+    <div class="step-text">
+      <h2>Worse than a coin flip.</h2>
+      <p>For the 1,665 yes/no questions, we scored each one simply: if the crowd's confidence was above 50%
+         and the outcome matched, right. Otherwise, wrong.</p>
+      <div class="stat-callout">32%</div>
+      <div class="stat-label">Accuracy across all boolean predictions</div>
+      <p style="margin-top:20px">Out of 1,665 predictions: <strong>537 right</strong>, <strong>1,128 wrong</strong>.
+         A coin flip would have done a better job.</p>
+    </div>
+    <div class="step-chart" id="chart-sankey-simple"></div>
+  </div>
+
+  <div class="story-step" data-chart="sankey-groups">
+    <div class="step-num">04 · By Group</div>
+    <div class="step-text">
+      <h2>Conflict was the hardest. AI was the most honest.</h2>
+      <p>Breaking it down by topic reveals clear patterns.
+         <strong>Geopolitics</strong> and <strong>Russia / Ukraine</strong> were brutal. The crowd
+         kept expecting conflicts and crises that quietly didn't happen.</p>
+      <p><strong>AI / Technology</strong> was the exception. The tech community was more calibrated,
+         possibly because they actually understood what they were predicting.</p>
+    </div>
+    <div class="step-chart" id="chart-sankey-groups"></div>
+  </div>
+
+  <div class="story-step" data-chart="beeswarm">
+    <div class="step-num">05 · Confidence</div>
+    <div class="step-text">
+      <h2>Higher confidence didn't mean higher accuracy.</h2>
+      <p>Each dot is a prediction. <span style="color:var(--right);font-weight:600">Teal</span> means right.
+         <span style="color:var(--wrong);font-weight:600">Red</span> means wrong.
+         They're spread along a confidence axis: low on the left, high on the right.</p>
+      <p>High confidence should predict accuracy. Here's what actually happened: <strong>red everywhere, at every confidence level.</strong> The crowd was confidently wrong just as often as it was uncertainly wrong. That's the definition of overconfidence.</p>
+    </div>
+    <div class="step-chart" id="chart-beeswarm"></div>
+  </div>
+
+  <div class="story-step" data-chart="misses">
+    <div class="step-num">06 · The Worst Misses</div>
+    <div class="step-text">
+      <h2>These ones really stung.</h2>
+      <p>The most embarrassing failures: questions where forecasters were most certain
+         something would happen. And it didn't. All carried the highest confidence score in the dataset.</p>
+    </div>
+    <div class="step-chart" id="chart-misses"></div>
+  </div>
+
+  <div class="story-step">
+    <div class="step-num">07 · The Verdict</div>
+    <div class="step-text">
+      <h2>We're wrong even when we're sure.</h2>
+      <p>Across 2,129 predictions, the crowd was wrong 68% of the time. But the sharper finding is in the confidence data: being highly confident didn't improve accuracy at all. <strong>The crowd was wrong at the same rate whether it was certain or uncertain.</strong> That's not bad luck. That's overconfidence, built in.</p>
+      <p><strong>Geopolitics was the hardest domain by a distance.</strong> Global conflicts don't telegraph themselves, they arrive suddenly, upend everything, and resist the kind of gradual modelling that forecasters are good at. The crowd kept expecting crises that quietly didn't happen, and missed the ones that did.</p>
+      <p>And then there's <strong>US Politics</strong>, the single most predicted topic by volume, every year, without exception. Not because it's easy to call, but its volatility is magnetic. When something is chaotic enough to keep thousands of analysts guessing indefinitely, that says as much about the subject as it does about the crowd chasing it.</p>
+      <p>We know we're not great at predictions. And yet we'll keep making them, because looking ahead is crucial for who we are.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- CLOSING FOOTER -->
+<footer class="closing-footer">
+  <span class="footer-note">
+    Data: <a href="https://huggingface.co/datasets/MoyYuan/FOReCAst" target="_blank" rel="noopener">FOReCAst dataset</a> · Metaculus resolved predictions · 2,129 questions · 2015–2024
+  </span>
+</footer>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const DATA = {
+  years: ["2015","2016","2017","2018","2019","2020","2021","2022","2023","2024"],
+  volume: [15,106,61,178,128,444,336,359,313,188],
+  groups: ["US Politics","COVID-19","Russia / Ukraine","Markets / Economy","Geopolitics","Policy / Regulation","AI / Technology","Space / SpaceX","Records / Milestones","UK Politics"],
+  ridgeline: {"US Politics":[1,12,9,54,26,115,78,72,70,57],"COVID-19":[0,12,0,5,5,111,52,26,13,4],"Russia / Ukraine":[0,0,1,2,1,2,6,116,34,11],"Markets / Economy":[0,8,11,22,19,58,45,28,27,32],"Geopolitics":[0,5,4,13,11,24,57,26,37,25],"Policy / Regulation":[1,5,4,15,14,37,32,48,44,16],"AI / Technology":[2,18,8,12,11,33,11,18,40,10],"Space / SpaceX":[11,32,12,34,13,11,22,7,21,8],"Records / Milestones":[0,13,9,9,12,40,19,4,18,20],"UK Politics":[0,1,3,12,16,13,14,14,9,5]},
+  total: {right:537, wrong:1128},
+  sankey: [{"g":"US Politics","r":166,"w":270},{"g":"COVID-19","r":40,"w":78},{"g":"Russia / Ukraine","r":33,"w":121},{"g":"Markets / Economy","r":53,"w":89},{"g":"Geopolitics","r":31,"w":154},{"g":"Policy / Regulation","r":53,"w":150},{"g":"AI / Technology","r":52,"w":62},{"g":"Space / SpaceX","r":47,"w":95},{"g":"Records / Milestones","r":37,"w":67},{"g":"UK Politics","r":25,"w":42}],
+  beeswarm: [[71,0],[64,0],[65,0],[67,0],[53,0],[42,0],[18,0],[36,1],[41,1],[61,0],[70,0],[65,0],[47,1],[54,0],[58,1],[67,1],[64,1],[47,0],[55,0],[70,0],[46,1],[60,1],[56,0],[53,0],[51,0],[49,1],[49,1],[69,0],[52,0],[59,0],[67,1],[45,0],[60,0],[48,1],[61,0],[51,0],[56,0],[60,0],[56,0],[64,0],[44,1],[65,0],[19,0],[42,1],[50,1],[36,1],[66,0],[68,0],[41,1],[30,1],[54,0],[26,1],[41,1],[49,1],[29,1],[58,0],[52,1],[48,1],[34,1],[45,1],[70,1],[71,0],[61,0],[70,0],[48,1],[63,1],[65,0],[69,1],[40,1],[69,0],[65,0],[63,1],[69,0],[61,0],[60,1],[62,1],[69,0],[59,0],[50,0],[41,0],[63,0],[60,1],[53,0],[52,1],[59,0],[50,0],[46,1],[37,1],[50,1],[70,0],[28,0],[47,1],[28,0],[69,0],[42,0],[35,1],[70,0],[44,1],[53,0],[66,0],[59,0],[42,1],[55,1],[62,0],[69,1],[61,0],[65,0],[56,0],[62,0],[69,0],[51,0],[68,0],[72,0],[39,1],[64,0],[35,0],[64,1],[64,0],[61,1],[58,0],[61,1],[68,0],[61,0],[70,0],[61,0],[68,0],[58,1],[58,0],[52,1],[69,0],[71,0],[56,0],[72,0],[53,1],[54,1],[59,0],[51,1],[42,0],[61,0],[71,0],[68,0],[62,0],[70,0],[61,0],[65,0],[66,0],[44,1],[43,0],[54,1],[64,1],[44,0],[49,1],[62,1],[37,1],[72,0],[63,0],[67,0],[70,0],[58,0],[55,0],[66,1],[69,0],[62,1],[62,0],[68,0],[65,0],[59,0],[67,0],[34,0],[24,1],[63,0],[46,0],[41,1],[66,0],[59,0],[71,0],[63,0],[42,1],[66,0],[67,0],[61,0],[69,1],[62,0],[34,0],[63,1],[52,0],[67,0],[63,0],[65,1],[65,0],[59,1],[63,0],[48,1],[54,0],[65,0],[71,0],[71,0],[73,0],[62,0],[70,1],[69,1],[59,0],[72,1],[70,0],[69,1],[71,1],[72,0],[66,0],[62,1],[69,0],[59,0],[52,1],[71,0],[71,0],[57,0],[21,1],[58,1],[70,0],[45,0],[62,1],[56,1],[69,0],[46,0],[41,1],[67,0],[59,1],[69,0],[60,1],[43,1],[38,1],[48,0],[72,0],[62,0],[44,1],[69,1],[50,0],[64,1],[72,0],[67,0],[67,1],[72,0],[42,0],[53,0],[64,0],[66,0],[52,1],[61,1],[56,0],[50,1],[48,1],[61,0],[52,1],[56,0],[29,1],[68,0],[36,0],[19,0],[50,1],[47,1],[70,0],[68,1],[64,0],[66,0],[43,1],[68,0],[48,1],[61,0],[66,0],[69,0],[69,0],[57,1],[52,0],[61,0],[72,0],[63,1],[51,0],[56,1],[70,1],[68,1],[64,1],[63,1],[69,1],[51,1],[55,1],[69,1],[57,1],[60,0],[68,1],[64,1],[71,0],[63,1],[70,0],[43,1],[56,1],[72,0],[72,0],[60,0],[14,0],[64,0],[40,1],[34,0],[51,1],[57,1],[65,0],[50,1],[51,1],[44,1],[66,0],[51,0],[14,1],[54,0],[70,1],[64,0],[53,1],[62,1],[49,0],[58,1],[71,1],[68,1],[49,1],[69,1],[71,0],[52,1],[70,0],[43,0],[68,1],[63,1],[68,0],[22,1],[65,0],[63,0],[61,0],[65,0],[69,1],[65,0],[58,1],[72,0],[71,0],[70,0],[70,0],[65,0],[60,0],[23,0],[63,0],[72,1],[51,1],[58,0],[62,0],[70,0],[46,1],[50,1],[41,1],[41,0],[55,1],[58,0],[62,1],[69,0],[60,0],[54,0],[55,1],[64,0],[59,1],[51,0],[70,0],[71,1],[72,0],[73,0],[55,0],[69,1],[49,0],[68,0],[73,1],[31,1],[61,1],[71,0],[46,0],[68,1],[72,0],[63,0],[63,1],[73,0],[67,0],[69,0],[70,0],[63,1],[56,0],[58,0],[65,0],[69,0],[70,0],[70,0],[49,1],[60,0],[72,0],[72,0],[37,1],[64,0],[36,0],[67,1],[57,0],[71,0],[66,0],[45,1],[35,1],[57,0],[63,0],[65,1],[68,0],[68,0],[65,1],[65,1],[63,0],[65,1],[41,1],[70,1],[72,0],[62,0],[54,0],[45,0],[63,0],[59,1],[32,1],[38,0],[49,0],[47,0],[56,1],[60,1],[72,0],[70,0],[67,0],[67,1],[69,0],[65,0],[68,0],[58,0],[65,0],[52,1],[57,1],[68,0],[68,0],[64,1],[53,0],[61,0],[65,1],[68,0],[71,0],[69,0],[71,0],[69,0],[71,0],[64,0],[66,0],[45,0],[71,1],[44,1],[52,0],[66,0],[63,0],[61,0],[64,0],[38,1],[72,1],[44,1],[55,1],[48,0],[58,0],[61,0],[43,0],[68,1],[67,1],[48,0],[52,0],[43,0],[70,0],[46,1],[69,0],[69,0],[49,0],[70,0],[72,0],[57,1],[54,0],[69,0],[68,0],[66,1],[55,1],[56,1],[67,0],[46,1],[59,0],[38,1],[69,1],[72,1],[53,0],[68,1],[51,1],[59,0],[56,1],[49,0],[46,0],[60,1],[63,0],[72,1],[68,0],[60,0],[72,0],[48,1],[59,1],[69,0],[67,0],[69,0],[69,0],[55,0],[40,1],[62,0],[61,1],[57,0],[37,1],[57,0],[41,1],[52,0],[70,0],[72,0],[55,0],[70,0],[53,0],[39,1],[71,0],[72,0],[68,0],[60,0],[47,1],[67,0],[69,0],[67,1],[51,0],[72,0],[72,0],[68,0],[71,0],[72,0],[73,0],[73,0],[62,0],[59,1],[55,1],[51,1],[53,0],[63,1],[51,1],[68,0],[51,1],[65,0],[36,0],[71,0],[69,0],[66,0],[50,0],[64,1],[41,0],[71,0],[72,0],[52,0],[50,1],[40,1],[58,1],[59,0],[66,0],[56,0],[50,0],[68,0],[64,0],[72,0],[72,0],[64,0],[71,0],[55,0],[67,0],[72,0],[57,0],[34,1],[39,0],[67,0],[72,0],[69,0],[55,1],[70,0],[68,0],[67,0],[60,0],[40,0],[60,1],[20,1],[72,0],[69,0],[70,0],[61,0],[66,1],[66,0],[61,0],[73,0],[73,0],[59,0],[46,0],[71,0],[49,0],[71,0],[71,0],[48,0],[56,1],[65,1],[48,0],[67,1],[61,1],[66,0],[34,1],[56,1],[64,1],[72,1],[68,1],[58,1],[69,0],[52,0],[59,0],[55,1],[31,1],[63,0],[69,0],[58,1],[63,0],[71,0],[57,1],[43,1],[68,0],[65,1],[70,0],[70,0],[53,1],[53,1],[56,1],[71,0],[55,0],[69,0],[67,0],[68,0],[67,1],[59,1],[50,0],[73,0],[31,1],[52,1],[71,0],[51,0],[72,0],[67,1],[64,1],[53,0],[59,0],[66,0],[67,0],[69,0],[70,0],[55,0],[68,0],[48,0],[67,0],[70,0],[66,1],[70,0],[53,1],[72,0],[72,0],[69,1],[59,0],[73,0],[72,0],[70,1],[59,0],[70,0],[65,0],[66,0],[58,0],[72,0],[46,0],[53,0],[50,1],[73,0],[14,1],[62,1],[67,0],[68,0],[61,0],[73,0],[66,0],[67,0],[66,0],[42,1],[70,0],[34,1],[60,1],[69,0],[69,0],[52,1],[72,0],[51,1],[61,0],[65,0],[72,0],[71,0],[71,1],[72,0],[73,0],[44,0],[46,0],[54,1],[45,0],[49,0],[70,0],[72,0],[70,0],[69,0],[64,1],[73,0],[52,0],[72,0],[72,0],[64,0],[70,0],[67,0],[67,0],[32,1],[53,1],[64,0],[69,0],[66,0],[72,0],[69,0],[64,1],[66,0],[59,0],[66,0],[57,0],[68,0],[70,0],[70,0],[68,0],[55,1],[73,0],[69,0],[64,0],[53,0],[51,1],[65,0],[68,0],[33,0],[71,0],[64,0],[40,0],[52,0],[30,0],[71,0],[56,0],[48,0],[73,0],[72,0],[45,1],[73,0],[73,0],[66,0],[72,0],[57,0],[59,0],[70,0],[51,1],[64,0],[73,0],[62,0],[65,1],[71,1],[63,0],[56,1],[70,0],[67,0],[56,0],[62,0],[58,1],[71,0],[63,0],[68,0],[54,1],[69,1],[70,0],[70,1],[70,0],[52,1],[71,0],[70,1],[59,0],[43,1],[66,1],[59,0],[67,1],[47,0],[65,0],[37,1],[29,1],[56,0],[62,1],[69,0],[58,1],[51,1],[49,1],[55,0],[51,1],[60,0],[64,1],[62,0],[63,0],[35,1],[52,0],[65,0],[59,1],[59,0],[73,0],[57,1],[51,1],[35,1],[72,0],[72,0],[70,0],[66,0],[62,0],[54,0],[68,0],[73,0],[73,0],[73,0],[69,0],[65,0],[40,0],[71,0],[69,0],[49,0],[71,0],[59,0],[72,1],[72,0],[62,0],[71,0],[69,0],[51,1],[71,0],[61,1],[73,0],[72,0],[49,1],[58,0],[52,1],[54,1],[10,0],[72,0],[71,0],[65,0],[39,0],[65,0],[71,0],[49,1],[71,0],[47,0],[73,0],[55,1],[69,0],[51,1],[72,0],[51,1],[60,0],[60,0],[69,1],[55,1],[70,0],[22,1],[62,0],[45,0],[65,0],[72,0],[68,0],[63,1],[72,1],[63,0],[65,0],[56,1],[22,1],[60,0],[61,1],[73,0],[48,1],[64,1],[70,1],[72,0],[58,0],[43,0],[71,0],[71,0],[67,0],[50,1],[56,0],[59,1],[68,0],[58,1],[72,0],[66,0],[73,0],[58,1],[71,1],[50,0],[66,1],[72,0],[73,0],[68,0],[65,0],[63,0],[71,0],[71,0],[66,0],[41,1],[73,0],[68,0],[58,1],[62,0],[72,0],[68,0],[72,0],[71,1],[59,1],[71,0],[73,0],[72,0],[34,0],[50,0],[62,0],[72,0],[69,0],[60,0],[73,0],[51,1],[71,0],[73,0],[55,1],[43,1],[71,0],[72,1],[54,1],[72,0],[71,0],[42,0],[72,0],[58,1],[71,0],[72,0],[71,0],[73,0],[57,1],[60,0],[73,0],[55,1],[51,1],[70,1],[45,0],[71,0],[69,1],[53,1],[42,0],[72,1],[53,1],[65,0],[72,0],[72,0],[70,0],[60,1],[59,0],[65,0],[71,0],[73,0],[72,0],[60,0],[70,0],[73,0],[66,0],[68,1],[70,0],[28,1],[53,0],[58,1],[51,1],[72,0],[17,0],[47,0],[68,0],[43,1],[49,0],[68,0],[31,0],[38,1],[69,1],[59,0],[62,0],[71,0],[32,0],[48,0],[57,0],[58,0],[55,1],[70,1],[47,1],[65,1],[49,1],[61,1],[70,0],[52,1],[59,1],[71,0],[72,0],[50,1],[70,0],[64,0],[66,0],[68,0],[69,0],[57,0],[71,0],[73,1],[56,1],[51,1],[53,1],[66,0],[71,0],[69,0],[72,0],[69,0],[63,0],[63,1],[70,0],[70,0],[66,0],[73,0],[67,0],[43,1],[26,0],[55,0],[73,0],[70,0],[68,0],[71,0],[72,0],[37,0],[50,0],[70,0],[71,0],[73,0],[68,0],[73,0],[64,1],[72,0],[68,0],[72,1],[72,0],[44,0],[72,0],[49,0],[71,0],[71,0],[59,0],[72,0],[66,0],[56,0],[72,0],[73,0],[23,0],[70,0],[69,0],[71,1],[71,0],[67,0],[70,0],[25,0],[5,1],[55,0],[53,1],[58,0],[69,0],[67,0],[59,0],[70,0],[52,0],[65,0],[54,0],[36,1],[71,0],[36,1],[63,0],[72,0],[68,0],[49,1],[64,0],[69,0],[35,0],[72,0],[51,0],[69,0],[68,0],[56,1],[72,0],[29,1],[59,0],[60,1],[43,1],[69,1],[64,0],[36,0],[54,0],[65,0],[68,0],[64,0],[58,0],[65,0],[70,0],[60,1],[22,1],[67,0],[67,0],[62,1],[51,0],[30,0],[70,0],[59,0],[70,1],[66,0],[72,0],[40,1],[29,1],[49,0],[71,0],[55,0],[70,0],[68,1],[71,0],[65,0],[70,1],[68,0],[65,1],[59,0],[60,1],[59,1],[36,1],[63,1],[71,0],[70,1],[72,0],[65,0],[66,0],[52,0],[47,1],[51,0],[68,0],[64,0],[69,0],[72,0],[64,0],[50,1],[66,0],[67,0],[56,0],[55,1],[67,0],[69,0],[66,0],[69,0],[64,0],[66,0],[73,0],[71,0],[56,1],[57,0],[66,0],[66,0],[55,0],[62,0],[70,0],[72,0],[51,1],[73,0],[39,1],[66,0],[70,0],[71,1],[72,0],[54,1],[71,0],[67,0],[53,0],[50,0],[69,0],[60,0],[63,0],[72,0],[73,0],[65,0],[73,0],[73,0],[69,0],[65,0],[56,1],[60,1],[55,0],[72,0],[68,0],[63,1],[72,0],[46,1],[40,1],[73,0],[67,1],[69,0],[71,0],[63,0],[64,1],[72,1],[69,0],[72,0],[68,0],[71,0],[73,1],[58,0],[72,0],[51,1],[71,1],[68,1],[55,1],[39,0],[73,0],[71,0],[54,1],[72,0],[73,0],[30,0],[70,0],[55,0],[66,1],[70,1],[67,0],[68,0],[67,0],[59,0],[62,0],[49,0],[40,1],[45,1],[57,0],[67,0],[68,0],[54,0],[40,1],[25,0],[52,1],[45,1],[54,0],[41,1],[57,0],[66,0],[53,0],[63,0],[70,0],[64,0],[38,1],[60,0],[23,1],[57,0],[69,1],[71,0],[65,0],[36,1],[72,0],[66,0],[68,1],[69,0],[2,1],[69,0],[64,0],[57,0],[71,0],[53,0],[48,1],[61,0],[61,1],[63,0],[50,0],[70,0],[52,0],[61,1],[45,0],[73,0],[33,0],[53,1],[47,1],[61,0],[72,0],[57,0],[65,1],[62,0],[15,0],[28,0],[29,1],[66,1],[45,0],[62,0],[69,0],[51,0],[50,0],[53,0],[64,0],[55,1],[62,0],[71,0],[51,0],[72,0],[57,1],[42,0],[61,1],[60,0],[16,0],[63,1],[61,1],[67,0],[71,0],[51,1],[65,0],[52,0],[63,1],[61,1],[46,0],[58,1],[66,0],[46,1],[61,0],[71,1],[65,0],[68,0],[65,0],[62,0],[61,0],[64,1],[70,0],[70,1],[33,0],[65,0],[57,0],[50,0],[55,0],[70,0],[63,0],[66,1],[71,0],[65,1],[62,0],[72,0],[72,0],[72,0],[28,1],[62,1],[52,1],[60,0],[64,1],[55,1],[58,0],[47,0],[28,0],[28,0],[66,0],[43,0],[65,0],[55,0],[72,0],[52,1],[67,0],[42,0],[62,1],[63,0],[70,0],[57,0],[26,1],[46,1],[67,1],[70,0],[65,0],[72,0],[45,0],[66,0],[64,0],[72,0],[68,0],[69,1],[71,0],[72,0],[48,1],[59,1],[48,0],[69,0],[62,0],[60,1],[63,1],[61,0],[55,1],[48,1],[65,0],[60,0],[41,1],[52,0],[52,0],[45,1],[45,0],[61,0],[11,0],[51,0],[61,0],[68,1],[55,0],[65,0],[38,1],[67,0],[59,0],[72,0],[62,0],[32,1],[68,0],[12,0],[73,0],[48,1],[70,1],[15,1],[65,0],[67,0],[64,0],[67,0],[45,0],[58,0],[66,0],[71,0],[52,0],[72,0],[66,1],[73,0],[68,1],[71,1],[57,1],[72,0],[73,0],[59,1],[57,1],[15,1],[59,0],[55,1],[61,1],[62,0],[30,1],[51,1],[66,0],[66,0],[54,0],[62,0],[69,0],[71,0],[60,1],[70,0],[56,1],[69,0],[69,0],[51,0],[59,1],[65,1],[71,1],[50,0],[66,0],[52,1],[71,0],[61,0],[72,0],[70,0],[53,1],[72,0],[62,1],[71,0],[64,0],[51,1],[73,0],[48,1],[69,0],[60,1],[66,0],[65,0],[64,0],[59,0],[54,0],[70,0],[72,0],[73,0],[50,0],[67,0],[66,1],[59,0],[72,0],[70,0],[71,0],[66,0],[72,0],[59,0],[47,0],[71,1],[57,0],[68,0],[59,0],[55,1],[58,1],[70,0],[49,1],[57,1],[68,0],[12,0],[73,0],[64,0],[63,0],[60,0],[69,0],[48,1],[57,1],[69,0],[67,0],[69,0],[69,0],[59,1],[72,0],[72,0],[70,1],[56,0],[43,1],[67,0],[50,1],[54,1],[61,0],[57,0],[62,0],[72,1],[68,1],[57,1],[57,1],[66,0],[64,0],[53,1],[64,0],[72,0],[51,0],[50,0],[38,1],[67,0],[45,0],[73,0],[72,0],[73,0],[69,0],[69,0],[72,0],[64,0],[73,0],[53,1],[67,0],[44,1],[68,0],[70,0],[71,0],[37,1],[50,0],[56,1],[67,0],[69,0],[68,0],[71,0],[72,0],[60,0],[43,0],[73,0],[69,0],[70,0],[66,0],[52,1],[44,0],[66,0],[72,0],[54,0],[57,1],[63,0],[73,0],[69,1],[66,1],[69,0],[70,1],[71,1],[70,0],[53,1],[65,0],[68,0],[43,0],[50,1],[72,0],[73,0],[61,0],[73,0],[73,0],[61,1],[72,0],[67,1],[51,0],[49,1],[70,0],[29,0],[72,0],[72,0],[68,0],[71,0],[49,0],[72,0],[66,0],[72,1],[56,1],[68,0],[55,1],[50,0],[63,0],[68,1],[70,0],[30,0],[67,0],[60,0],[70,0],[27,0],[71,0],[65,0],[67,0],[68,0],[66,0],[69,0],[71,0],[70,0],[70,0],[72,0],[50,1],[67,0],[35,1],[51,1],[47,0],[69,0],[41,1],[65,0],[62,0],[71,0],[70,0],[50,0]],
+  misses: [
+    {q:"Will Texas vote to secede from the United States before 2024?", c:73, g:"US Politics", y:"2024"},
+    {q:"Will Yevgeny V. Prigozhin make a public appearance before 23 February 2024?", c:73, g:"US Politics", y:"2023"},
+    {q:"Will the US launch a nuclear first-strike on North Korea in 2018?", c:73, g:"Geopolitics", y:"2018"},
+    {q:"Will a room-temperature and ambient-pressure superconductor be used in a commercial application before 2025?", c:73, g:"Policy / Regulation", y:"2025"},
+    {q:"Will civil war break out in Israel before 2024?", c:73, g:"Geopolitics", y:"2024"},
+    {q:"Will F-22 or F-35 fighter jets be pledged to Ukraine by January 1, 2024?", c:73, g:"Russia / Ukraine", y:"2024"},
+    {q:"Will there be a non-test nuclear detonation in Iran before 2025?", c:73, g:"Geopolitics", y:"2025"}
+  ]
+};
+
+// ── PALETTE ───────────────────────────────────────────────────────────────
+const RIGHT   = '#0F766E';
+const WRONG   = '#BE123C';
+const BORDER  = '#E4E0D8';
+const INK     = '#18181B';
+const MUTED   = '#A1A1AA';
+
+const GROUP_COLORS = d3.scaleOrdinal()
+  .domain(DATA.groups)
+  .range(['#1E3A5F','#7B2D2D','#6B4226','#1A4731','#4C2177','#1A5470','#2C4A7C','#2D3561','#5C4A1E','#7B2D5E']);
+
+// ── MILESTONES ────────────────────────────────────────────────────────────
+const MILESTONES = [
+  { year: '2016', label: 'Trump elected'    },
+  { year: '2016', label: 'Brexit vote'      },
+  { year: '2019', label: 'Brexit deadline'  },
+  { year: '2020', label: 'COVID-19'         },
+  { year: '2020', label: 'Biden elected'    },
+  { year: '2021', label: 'Jan 6 Capitol'    },
+  { year: '2022', label: 'Ukraine invasion' },
+  { year: '2022', label: 'ChatGPT launches' },
+  { year: '2023', label: 'GPT-4 released'   },
+  { year: '2024', label: 'Trump re-elected' },
+];
+
+// ── TOOLTIP ───────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTip(e, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = 1;
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { tooltip.style.opacity = 0; }
+
+// ── CHART DIMENSIONS ──────────────────────────────────────────────────────
+const VW = 860;
+
+// ── CHART 1: VOLUME ────────────────────────────────────────────────────────
+function drawVolume(container) {
+  const VH = 300;
+  const m  = { top: 88, right: 56, bottom: 44, left: 52 };
+  const w  = VW - m.left - m.right;
+  const h  = VH - m.top - m.bottom;
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${VW} ${VH}`).attr('width','100%');
+
+  const g = svg.append('g').attr('transform', `translate(${m.left},${m.top})`);
+
+  const x = d3.scalePoint().domain(DATA.years).range([0, w]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(DATA.volume) * 1.12]).range([h, 0]);
+
+  // Gradient fill
+  const defs = svg.append('defs');
+  const grad = defs.append('linearGradient').attr('id','vol-grad').attr('x1',0).attr('x2',0).attr('y1',0).attr('y2',1);
+  grad.append('stop').attr('offset','0%').attr('stop-color', INK).attr('stop-opacity', 0.1);
+  grad.append('stop').attr('offset','100%').attr('stop-color', INK).attr('stop-opacity', 0.01);
+
+  const area = d3.area().x((_,i) => x(DATA.years[i])).y0(h).y1(d => y(d)).curve(d3.curveCatmullRom.alpha(0.5));
+  const line = d3.line().x((_,i) => x(DATA.years[i])).y(d => y(d)).curve(d3.curveCatmullRom.alpha(0.5));
+
+  g.append('path').datum(DATA.volume).attr('fill','url(#vol-grad)').attr('d', area);
+
+  const path = g.append('path').datum(DATA.volume)
+    .attr('fill','none').attr('stroke', INK).attr('stroke-width', 2).attr('d', line);
+  const len = path.node().getTotalLength();
+  path.attr('stroke-dasharray', len).attr('stroke-dashoffset', len)
+    .transition().duration(2200).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(y).ticks(4).tickSize(-w))
+    .call(a => a.select('.domain').remove())
+    .call(a => a.selectAll('.tick line').attr('stroke', BORDER).attr('stroke-dasharray','3,2'))
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+  g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x).tickSize(0).tickPadding(10))
+    .call(a => a.select('.domain').remove())
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+
+  // Milestones — lane assignment to prevent horizontal overlap
+  const CHAR_W = 6.5; // approx px per char at 11px
+  const LANE_H = 15;  // px between lanes
+  const PAD    = 5;   // horizontal padding between labels
+  const lanes  = [];  // lanes[i] = array of {left, right} intervals
+
+  // Draw one dashed line per unique year
+  const drawnLines = new Set();
+  MILESTONES.forEach(ms => {
+    const xi = x(ms.year);
+    if (xi === undefined || drawnLines.has(ms.year)) return;
+    drawnLines.add(ms.year);
+    g.append('line')
+      .attr('x1', xi).attr('x2', xi).attr('y1', 0).attr('y2', h)
+      .attr('stroke', WRONG).attr('stroke-width', 1)
+      .attr('stroke-dasharray','3,3').attr('opacity', 0.4);
+  });
+
+  MILESTONES.forEach(ms => {
+    const xi = x(ms.year);
+    if (xi === undefined) return;
+    const half  = (ms.label.length * CHAR_W) / 2;
+    const left  = xi - half;
+    const right = xi + half;
+
+    // Find first lane with no collision
+    let laneIdx = 0;
+    while (true) {
+      if (!lanes[laneIdx]) lanes[laneIdx] = [];
+      const clash = lanes[laneIdx].some(s => right + PAD > s.left && left - PAD < s.right);
+      if (!clash) { lanes[laneIdx].push({left, right}); break; }
+      laneIdx++;
+    }
+
+    const ly = -10 - laneIdx * LANE_H;
+    // Clamp anchor near edges
+    const anchor = left < 0 ? 'start' : right > w ? 'end' : 'middle';
+    const tx = anchor === 'start' ? 0 : anchor === 'end' ? w : xi;
+    g.append('text')
+      .attr('x', tx).attr('y', ly)
+      .attr('text-anchor', anchor)
+      .style('font-size','11px').style('fill', WRONG).style('font-weight','600')
+      .text(ms.label);
+  });
+
+  // Dots
+  g.selectAll('.vdot').data(DATA.volume).enter().append('circle')
+    .attr('class','vdot').attr('cx',(_,i) => x(DATA.years[i])).attr('cy', d => y(d))
+    .attr('r',4).attr('fill', INK).attr('stroke','#F7F5F0').attr('stroke-width',2)
+    .style('cursor','pointer')
+    .on('mouseover',(e,d) => { const i = DATA.volume.indexOf(d); showTip(e,`<strong>${DATA.years[i]}</strong><br>${d} questions`); })
+    .on('mouseout', hideTip);
+}
+
+// ── CHART 2: RIDGELINE ─────────────────────────────────────────────────────
+function drawRidgeline(container) {
+  const VH = 580;
+  const m  = { top: 24, right: 44, bottom: 32, left: 122 };
+  const w  = VW - m.left - m.right;
+  const nG = DATA.groups.length;
+  const rowH = (VH - m.top - m.bottom) / nG;
+  const overlap = 2.2; // room for peaks to breathe above baseline
+
+  // Sort descending: most questions at top
+  const sorted = DATA.groups.slice().sort(
+    (a, b) => d3.sum(DATA.ridgeline[b]) - d3.sum(DATA.ridgeline[a])
+  );
+
+  // Shared global y-scale so volume differences are visible across rows
+  const globalMax = d3.max(sorted.flatMap(grp => DATA.ridgeline[grp]));
+  const yShared = d3.scaleLinear().domain([0, globalMax]).range([rowH * overlap, 0]);
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${VW} ${VH}`).attr('width','100%');
+
+  const x = d3.scalePoint().domain(DATA.years).range([0, w]).padding(0.3);
+
+  svg.append('g').attr('transform',`translate(${m.left},${VH - m.bottom})`)
+    .call(d3.axisBottom(x).tickSize(0).tickPadding(6))
+    .call(a => a.select('.domain').attr('stroke', BORDER))
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+
+  sorted.forEach((grp, gi) => {
+    const vals  = DATA.ridgeline[grp];
+    const total = d3.sum(vals);
+    const yBase = m.top + (gi + 1) * rowH;
+
+    const row = svg.append('g').attr('transform',`translate(${m.left},${yBase - rowH * overlap})`);
+    const aFn = d3.area().x((_,i) => x(DATA.years[i])).y0(rowH * overlap).y1(d => yShared(d)).curve(d3.curveCatmullRom.alpha(0.5));
+    const lFn = d3.line().x((_,i) => x(DATA.years[i])).y(d => yShared(d)).curve(d3.curveCatmullRom.alpha(0.5));
+
+    // Opaque background so this row covers what's behind
+    row.append('path').datum(vals).attr('fill', '#F7F5F0').attr('d', aFn);
+    // Very light fill
+    row.append('path').datum(vals).attr('fill', INK).attr('fill-opacity', 0.14).attr('d', aFn);
+    // Black line
+    row.append('path').datum(vals).attr('fill','none').attr('stroke', INK).attr('stroke-width', 1.2).attr('d', lFn)
+      .attr('opacity',0).transition().delay(gi * 110).duration(900).attr('opacity',1);
+
+    svg.append('text')
+      .attr('x', m.left - 8).attr('y', yBase - rowH * 0.28)
+      .attr('text-anchor','end').attr('dominant-baseline','middle')
+      .style('font-size','12px').style('fill', INK).style('font-weight','500')
+      .text(grp).attr('opacity',0).transition().delay(gi * 110).duration(700).attr('opacity',1);
+
+    svg.append('text')
+      .attr('x', m.left + w + 10).attr('y', yBase - rowH * 0.28)
+      .attr('dominant-baseline','middle')
+      .style('font-size','12px').style('fill', MUTED).style('font-variant-numeric','tabular-nums')
+      .text(total)
+      .attr('opacity',0).transition().delay(gi * 110 + 300).duration(700).attr('opacity',1);
+  });
+}
+
+// ── CHART 3+4: SANKEY ─────────────────────────────────────────────────────
+// isGroup: true for the group breakdown sankey
+function renderSankey(container, nodes, links, isGroup = false) {
+  const VH = 400;
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${VW} ${VH}`).attr('width','100%');
+
+  const sk = d3.sankey()
+    .nodeWidth(14)
+    .nodePadding(nodes.length > 4 ? 5 : 20)
+    // Right on top, Wrong below it — sort by a fixed priority within each column
+    .nodeSort((a, b) => {
+      const pri = { Right: 0, Wrong: 1 };
+      const pa = pri[a.name] ?? 2;
+      const pb = pri[b.name] ?? 2;
+      return pa - pb;
+    })
+    .extent([[20, 20], [VW - 120, VH - 20]]);
+
+  const { nodes: sN, links: sL } = sk({
+    nodes: nodes.map(d => ({...d})),
+    links: links.map(d => ({...d}))
+  });
+
+  svg.selectAll('.sk-link').data(sL).enter().append('path')
+    .attr('d', d3.sankeyLinkHorizontal())
+    .attr('fill','none')
+    .attr('stroke', d => d.source.color)
+    .attr('stroke-width', d => Math.max(1, d.width))
+    .attr('stroke-opacity', 0)
+    .style('cursor','pointer')
+    .on('mouseover', function(e, d) {
+      d3.select(this).attr('stroke-opacity', 0.55);
+      if (isGroup) {
+        // "Right in US Politics: 350 (71%)"
+        const pct = Math.round(d.value / d.target.value * 100);
+        showTip(e, `<strong>${d.source.name} in ${d.target.name}</strong><br>${d.value.toLocaleString()} predictions (${pct}%)`);
+      } else {
+        showTip(e, `${d.value.toLocaleString()} predictions`);
+      }
+    })
+    .on('mouseout', function() { d3.select(this).attr('stroke-opacity', 0.2); hideTip(); })
+    .transition().delay((_,i) => i * 25).duration(1100).attr('stroke-opacity', 0.2);
+
+  const ng = svg.selectAll('.sk-node').data(sN).enter().append('g');
+
+  ng.append('rect')
+    .attr('x', d => d.x0).attr('y', d => d.y0)
+    .attr('width', d => d.x1 - d.x0).attr('height', d => Math.max(2, d.y1 - d.y0))
+    .attr('fill', d => d.color).attr('rx', 2)
+    .attr('opacity',0).transition().duration(900).attr('opacity',1);
+
+  const LABEL_SIZE = '13px';
+
+  ng.append('text')
+    .attr('x', d => d.x1 > VW / 2 ? d.x1 + 8 : d.x0 - 8)
+    .attr('y', d => (d.y0 + d.y1) / 2 - 7)
+    .attr('text-anchor', d => d.x1 > VW / 2 ? 'start' : 'end')
+    .attr('dominant-baseline','middle')
+    .style('font-size', LABEL_SIZE)
+    .style('fill', INK).style('font-weight','500')
+    .text(d => d.name)
+    .attr('opacity',0).transition().delay(400).duration(700).attr('opacity',1);
+
+  // Percentage labels: same size as node name, placed just below the name
+  sN.filter(d => d.name === 'Right' || d.name === 'Wrong').forEach(d => {
+    const pct = Math.round(d.value / (DATA.total.right + DATA.total.wrong) * 100);
+    const onLeft = d.x1 < VW / 2;
+    const px = onLeft ? d.x0 - 8 : d.x1 + 8;
+    svg.append('text')
+      .attr('x', px).attr('y', (d.y0 + d.y1) / 2 + 7)
+      .attr('text-anchor', onLeft ? 'end' : 'start')
+      .attr('dominant-baseline','middle')
+      .style('font-size', LABEL_SIZE).style('fill', d.color).style('font-weight','700')
+      .text(`${pct}%`)
+      .attr('opacity',0).transition().delay(700).duration(600).attr('opacity',1);
+  });
+}
+
+function drawSankeySimple(container) {
+  renderSankey(container,
+    [{name:'All Predictions', color:'#52525B'},{name:'Right', color:RIGHT},{name:'Wrong', color:WRONG}],
+    [{source:0,target:1,value:DATA.total.right},{source:0,target:2,value:DATA.total.wrong}]
+  );
+}
+
+function drawSankeyGroups(container) {
+  // Right/Wrong are sources (left), groups are targets (right)
+  const GROUP_NODE_COLOR = '#3F3F46'; // dark grey, less heavy than full black
+  const nodes = [
+    {name:'Right', color:RIGHT},
+    {name:'Wrong', color:WRONG},
+    ...DATA.groups.map(g => ({name:g, color: GROUP_NODE_COLOR})),
+  ];
+  const links = [];
+  DATA.sankey.forEach((d, i) => {
+    if (d.r > 0) links.push({source:0, target:i + 2, value:d.r}); // Right → group
+    if (d.w > 0) links.push({source:1, target:i + 2, value:d.w}); // Wrong → group
+  });
+  renderSankey(container, nodes, links, true);
+}
+
+// ── CHART 5: BEESWARM ──────────────────────────────────────────────────────
+function drawBeeswarm(container) {
+  const VH = 300;
+  const m  = { top: 48, right: 20, bottom: 48, left: 20 };
+  const w  = VW - m.left - m.right;
+  const h  = VH - m.top - m.bottom;
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${VW} ${VH}`).attr('width','100%');
+  const g = svg.append('g').attr('transform',`translate(${m.left},${m.top})`);
+
+  const x = d3.scaleLinear().domain([0, 100]).range([0, w]);
+  const R = 3;
+
+  const dots = DATA.beeswarm.map(([c, r]) => ({ c, r, px: x(c) }));
+  const bins  = {};
+  dots.forEach(d => {
+    const bin = Math.round(d.px / (R * 2)) * (R * 2);
+    if (!bins[bin]) bins[bin] = 0;
+    const idx  = bins[bin]++;
+    const row  = Math.floor(idx / 2);
+    const side = idx % 2 === 0 ? 1 : -1;
+    d.py = h / 2 + side * (row * (R * 2 + 1) + R);
+  });
+
+  // Mid line
+  g.append('line').attr('x1',x(50)).attr('x2',x(50)).attr('y1',0).attr('y2',h)
+    .attr('stroke', BORDER).attr('stroke-width',1).attr('stroke-dasharray','4,3');
+  g.append('text').attr('x',x(50)).attr('y',-14).attr('text-anchor','middle')
+    .style('font-size','12px').style('fill', MUTED).text('50% confidence');
+  g.append('text').attr('x',0).attr('y',-26).style('font-size','12px').style('fill', MUTED).text('Less confident');
+  g.append('text').attr('x',w).attr('y',-26).attr('text-anchor','end').style('font-size','12px').style('fill', MUTED).text('More confident');
+
+  g.selectAll('circle').data(dots).enter().append('circle')
+    .attr('cx', d => d.px).attr('cy', h / 2).attr('r', R)
+    .attr('fill', d => d.r ? RIGHT : WRONG).attr('fill-opacity', 0.55)
+    .transition().delay((_,i) => i * 0.4).duration(1000).ease(d3.easeQuadOut)
+    .attr('cy', d => d.py);
+
+  g.append('g').attr('transform',`translate(0,${h + 14})`)
+    .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + '%').tickSize(0).tickPadding(6))
+    .call(a => a.select('.domain').attr('stroke', BORDER))
+    .call(a => a.selectAll('text').style('fill', MUTED).style('font-size','12px'));
+
+  // Legend
+  [[RIGHT,'Crowd right'],[WRONG,'Crowd wrong']].forEach(([c,l],i) => {
+    const lx = m.left + w - 180 + i * 100;
+    svg.append('circle').attr('cx',lx).attr('cy',VH - 10).attr('r',4).attr('fill',c).attr('fill-opacity',0.75);
+    svg.append('text').attr('x',lx + 8).attr('y',VH - 6).style('font-size','12px').style('fill','#52525B').text(l);
+  });
+}
+
+// ── CHART 6: MISSES ────────────────────────────────────────────────────────
+function drawMisses(container) {
+  const div = d3.select(container).append('div').style('width','100%');
+  DATA.misses.forEach((d, i) => {
+    const card = div.append('div').attr('class','miss-card');
+    card.append('div').attr('class','miss-q').text(d.q);
+    const meta = card.append('div').attr('class','miss-meta');
+    meta.append('span').attr('class','miss-conf').text(`${d.c}% confident it would happen`);
+    meta.append('span').attr('class','miss-group').text(`${d.g} · ${d.y}`);
+    setTimeout(() => card.node().classList.add('visible'), i * 90 + 60);
+  });
+}
+
+// ── CHART REGISTRY ────────────────────────────────────────────────────────
+const CHARTS = {
+  'volume':        drawVolume,
+  'ridgeline':     drawRidgeline,
+  'sankey-simple': drawSankeySimple,
+  'sankey-groups': drawSankeyGroups,
+  'beeswarm':      drawBeeswarm,
+  'misses':        drawMisses,
+};
+
+// ── INTERSECTION OBSERVER ─────────────────────────────────────────────────
+// Observe .step-chart elements directly so the fade triggers
+// exactly when the chart container scrolls into view
+const chartObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const chartEl = entry.target;
+    const key     = chartEl.id.replace('chart-', '');
+    if (chartEl.dataset.drawn) return;
+    if (!CHARTS[key]) return;
+
+    chartEl.dataset.drawn = 'true';
+    CHARTS[key](chartEl);
+
+    // Double rAF: first frame registers opacity:0, second triggers transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chartEl.classList.add('visible');
+      });
+    });
+  });
+}, {
+  threshold: 0.12,
+  rootMargin: '0px 0px -60px 0px'
+});
+
+document.querySelectorAll('.step-chart').forEach(el => chartObserver.observe(el));
+</script>
+</body>
+</html>
