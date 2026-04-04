@@ -207,7 +207,7 @@
   <h1>We are <em>bad</em> at<br>predicting the future.</h1>
   <p class="byline">A story about predictions by <a href="https://www.linkedin.com/in/ffmc/" target="_blank" rel="noopener">Francisco Cardoso</a></p>
   <p class="lead">
-    How good are we, really? We looked at 2,129 resolved predictions from Metaculus,
+    We looked at 2,129 resolved predictions from Metaculus,
     a platform where thousands of people put real forecasts on the record with confidence scores.
     Each question typically attracted between 40 and 300 forecasters, with a median around 60.
     High-profile questions on elections or pandemics drew several thousand.
@@ -256,10 +256,10 @@
       <p>Some patterns are hard to miss. <strong>COVID-19</strong> went from nothing to the most
          predicted topic on the platform in a single year, then collapsed almost as fast as it arrived.
          <strong>Russia / Ukraine</strong> barely registered until February 2022, then exploded overnight.
-         World events don't build gradually. They arrive, and forecasters chase them.</p>
+         World events don't build gradually they arrive, and forecasters chase them.</p>
       <p>Then there's <strong>US Politics</strong>. No pandemic, no war, no once-in-a-generation crisis
          ever knocked it off the top. Year after year, it pulled in more forecasters than anything else
-         on the planet. Make of that what you will. When something is chaotic enough to keep
+         on the planet. When something is chaotic enough to keep
          thousands of analysts guessing indefinitely, that says more about the subject than the forecasters.</p>
     </div>
     <div class="step-chart" id="chart-ridgeline"></div>
@@ -299,7 +299,7 @@
       <p>Each dot is a prediction. <span style="color:var(--right);font-weight:600">Teal</span> means right.
          <span style="color:var(--wrong);font-weight:600">Red</span> means wrong.
          They're spread along a confidence axis: low on the left, high on the right.</p>
-      <p>High confidence should predict accuracy. Here's what actually happened: <strong>red everywhere, at every confidence level.</strong> The crowd was confidently wrong just as often as it was uncertainly wrong. That's the definition of overconfidence.</p>
+      <p>High confidence should predict accuracy. Here's what actually happened: <strong>red everywhere, at every confidence level.</strong> The crowd was confidently wrong just as often as it was uncertainly wrong.ma</p>
     </div>
     <div class="step-chart" id="chart-beeswarm"></div>
   </div>
@@ -452,7 +452,7 @@ function drawVolume(container) {
     drawnLines.add(ms.year);
     g.append('line')
       .attr('x1', xi).attr('x2', xi).attr('y1', 0).attr('y2', h)
-      .attr('stroke', WRONG).attr('stroke-width', 1)
+      .attr('stroke', '#3F3F46').attr('stroke-width', 1)
       .attr('stroke-dasharray','3,3').attr('opacity', 0.4);
   });
 
@@ -479,7 +479,7 @@ function drawVolume(container) {
     g.append('text')
       .attr('x', tx).attr('y', ly)
       .attr('text-anchor', anchor)
-      .style('font-size', FSZ.s).style('fill', WRONG).style('font-weight','600')
+      .style('font-size', FSZ.s).style('fill', '#3F3F46').style('font-weight','600')
       .text(ms.label);
   });
 
